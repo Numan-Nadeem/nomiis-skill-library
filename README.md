@@ -88,7 +88,7 @@ Every time a manager starts, it runs these commands in order:
 ```text
 git pull --rebase
 git submodule sync --recursive
-git submodule foreach --recursive 'test -z "$(git status --porcelain)"'
+check each submodule with git status --porcelain
 git submodule update --init --remote --recursive
 ```
 

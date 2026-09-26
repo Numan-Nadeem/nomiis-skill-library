@@ -45,9 +45,16 @@ function Sync-GitRepository {
         throw "Git submodule sync failed."
     }
 
-    git submodule foreach --recursive 'test -z "$(git status --porcelain)"'
-    if ($LASTEXITCODE -ne 0) {
-        throw "A submodule has local changes. Commit or stash them before updating external skills."
+    $submodulePaths = @(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' |
+        ForEach-Object {
+            ($_ -split '\s+', 2)[1]
+        })
+
+    foreach ($submodulePath in $submodulePaths) {
+        $submoduleChanges = @(git -C $submodulePath status --porcelain)
+        if ($submoduleChanges.Count -gt 0) {
+            throw "A submodule has local changes: $submodulePath. Commit or stash them before updating external skills."
+        }
     }
 
     git submodule update --init --remote --recursive
