@@ -1,3 +1,6 @@
 [submodule "external/cloudflare-security-audit"]
 	path = external/cloudflare-security-audit
 	url = https://github.com/cloudflare/security-audit-skill.git
+[submodule "external/taste-skill"]
+	path = external/taste-skill
+	url = https://github.com/Leonxlnx/taste-skill
