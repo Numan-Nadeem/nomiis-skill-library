@@ -1,0 +1,257 @@
+$ErrorActionPreference = "Stop"
+
+$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $RepoRoot
+
+$ExternalDir = Join-Path $RepoRoot "external"
+$PersonalDir = Join-Path $RepoRoot "personal"
+
+function Show-Header {
+    Clear-Host
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "       Nomi's AI Skills Library" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+}
+
+function Test-Dependencies {
+    Write-Host "[Checking dependencies]" -ForegroundColor Yellow
+    Write-Host ""
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        throw "Git is not installed or not available in PATH."
+    }
+
+    if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
+        throw "npx is not installed or not available in PATH. Install Node.js first."
+    }
+
+    Write-Host "Git: OK" -ForegroundColor Green
+    Write-Host "npx: OK" -ForegroundColor Green
+    Write-Host ""
+}
+
+function Sync-GitRepository {
+    Write-Host "[1/2] Pulling your skills repository..." -ForegroundColor Yellow
+    git pull --rebase
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git pull failed."
+    }
+
+    Write-Host "[2/2] Initializing/updating submodules..." -ForegroundColor Yellow
+    git submodule sync --recursive
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git submodule sync failed."
+    }
+
+    git submodule foreach --recursive 'test -z "$(git status --porcelain)"'
+    if ($LASTEXITCODE -ne 0) {
+        throw "A submodule has local changes. Commit or stash them before updating external skills."
+    }
+
+    git submodule update --init --remote --recursive
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git submodule update failed."
+    }
+
+    Write-Host ""
+    Write-Host "Submodule status:" -ForegroundColor Cyan
+    git submodule status --recursive
+    Write-Host ""
+}
+
+function Get-SkillDirectories {
+    $skills = @()
+
+    if (Test-Path $ExternalDir) {
+        Get-ChildItem -Path $ExternalDir -Directory | ForEach-Object {
+            $repository = $_
+
+            Get-ChildItem -Path $repository.FullName -Filter "SKILL.md" -File -Recurse -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    $skillDirectory = $_.Directory.FullName
+                    $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
+
+                    $skills += [PSCustomObject]@{
+                        Name = $_.Directory.Name
+                        Type = "External"
+                        Source = $relativePath
+                        Path = $skillDirectory
+                    }
+                }
+        }
+    }
+
+    if (Test-Path $PersonalDir) {
+        Get-ChildItem -Path $PersonalDir -Directory | ForEach-Object {
+            $skillDirectory = $_.FullName
+            $skillFile = Join-Path $skillDirectory "SKILL.md"
+
+            if (Test-Path $skillFile) {
+                $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
+
+                $skills += [PSCustomObject]@{
+                    Name = $_.Name
+                    Type = "Personal"
+                    Source = $relativePath
+                    Path = $skillDirectory
+                }
+            }
+        }
+    }
+
+    return $skills
+}
+
+function Show-AvailableSkills {
+    $skills = @(Get-SkillDirectories)
+
+    if ($skills.Count -eq 0) {
+        Write-Host "No SKILL.md files were found." -ForegroundColor Red
+        return @()
+    }
+
+    Write-Host ""
+    Write-Host "Available Skills" -ForegroundColor Cyan
+    Write-Host "----------------" -ForegroundColor Cyan
+
+    for ($index = 0; $index -lt $skills.Count; $index++) {
+        $skill = $skills[$index]
+        Write-Host "[$($index + 1)] $($skill.Name)" -ForegroundColor White
+        Write-Host "    Type:   $($skill.Type)" -ForegroundColor DarkGray
+        Write-Host "    Source: $($skill.Source)" -ForegroundColor DarkGray
+    }
+
+    Write-Host ""
+    return $skills
+}
+
+function Install-Skill {
+    param (
+        [Parameter(Mandatory = $true)]
+        $Skill
+    )
+
+    Write-Host "Installing: $($Skill.Name)" -ForegroundColor Cyan
+    Write-Host "Source: $($Skill.Path)" -ForegroundColor DarkGray
+
+    npx skills add "$($Skill.Path)" -g -y
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAILED: $($Skill.Name)" -ForegroundColor Red
+        return $false
+    }
+
+    Write-Host "SUCCESS: $($Skill.Name)" -ForegroundColor Green
+    return $true
+}
+
+function Install-AllSkills {
+    $skills = @(Get-SkillDirectories)
+
+    if ($skills.Count -eq 0) {
+        Write-Host "No skills found." -ForegroundColor Red
+        return
+    }
+
+    $success = 0
+    $failed = 0
+
+    foreach ($skill in $skills) {
+        if (Install-Skill -Skill $skill) {
+            $success++
+        }
+        else {
+            $failed++
+        }
+    }
+
+    Write-Host ""
+    Write-Host "Installation Summary" -ForegroundColor Cyan
+    Write-Host "Successful: $success" -ForegroundColor Green
+    Write-Host "Failed:     $failed" -ForegroundColor Red
+}
+
+function Install-SelectedSkills {
+    $skills = @(Show-AvailableSkills)
+    if ($skills.Count -eq 0) {
+        return
+    }
+
+    $selection = Read-Host "Enter skill numbers separated by commas"
+    if ([string]::IsNullOrWhiteSpace($selection)) {
+        Write-Host "No skills selected." -ForegroundColor Yellow
+        return
+    }
+
+    $selectedSkills = @()
+    foreach ($value in ($selection -split ',')) {
+        $number = 0
+        $value = $value.Trim()
+
+        if (-not [int]::TryParse($value, [ref]$number) -or $number -lt 1 -or $number -gt $skills.Count) {
+            Write-Host "Invalid skill number: $value" -ForegroundColor Red
+            continue
+        }
+
+        $selectedSkills += $skills[$number - 1]
+    }
+
+    foreach ($skill in $selectedSkills) {
+        Install-Skill -Skill $skill
+    }
+}
+
+function Update-InstalledSkills {
+    npx skills update -g -y
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Skill update failed." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "Installed skills updated successfully." -ForegroundColor Green
+}
+
+function Show-InstalledSkills {
+    npx skills list -g
+}
+
+function Show-RepositoryStatus {
+    git status
+}
+
+try {
+    Show-Header
+    Test-Dependencies
+    Sync-GitRepository
+}
+catch {
+    Write-Host "Synchronization failed: $($_.Exception.Message)" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
+while ($true) {
+    Show-Header
+    Write-Host "Repository: $RepoRoot" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "1. Install / update ALL skills"
+    Write-Host "2. Select skills to install / update"
+    Write-Host "3. Update already installed skills"
+    Write-Host "4. Show available skills"
+    Write-Host "5. Show installed skills"
+    Write-Host "6. Show Git repository status"
+    Write-Host "7. Exit"
+    Write-Host ""
+
+    switch (Read-Host "Choose an option") {
+        "1" { Install-AllSkills; Read-Host "Press Enter to continue" }
+        "2" { Install-SelectedSkills; Read-Host "Press Enter to continue" }
+        "3" { Update-InstalledSkills; Read-Host "Press Enter to continue" }
+        "4" { Show-AvailableSkills; Read-Host "Press Enter to continue" }
+        "5" { Show-InstalledSkills; Read-Host "Press Enter to continue" }
+        "6" { Show-RepositoryStatus; Read-Host "Press Enter to continue" }
+        "7" { Write-Host "Goodbye." -ForegroundColor Cyan; exit 0 }
+        default { Write-Host "Invalid option." -ForegroundColor Red; Start-Sleep -Seconds 1 }
+    }
+}
