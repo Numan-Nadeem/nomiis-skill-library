@@ -129,6 +129,18 @@ install_all_skills() {
     printf 'Failed:     %d\n' "$failed"
 }
 
+install_with_skills_selector() {
+    printf 'Launching the npx skills selector...\n'
+    printf 'Select the skills you want to install globally.\n'
+
+    if npx skills add "$REPO_ROOT" -g --full-depth; then
+        printf 'Selected skills installed successfully.\n'
+    else
+        printf 'The skills selector installation failed.\n' >&2
+        return 1
+    fi
+}
+
 install_selected_skills() {
     local selection
     local value
@@ -197,25 +209,27 @@ run_menu() {
     while true; do
         show_header
         printf 'Repository: %s\n\n' "$REPO_ROOT"
-        printf '1. Install / update ALL skills\n'
-        printf '2. Select skills to install / update\n'
-        printf '3. Update already installed skills\n'
-        printf '4. Show available skills\n'
-        printf '5. Show installed skills\n'
-        printf '6. Show Git repository status\n'
-        printf '7. Add an external skill submodule\n'
-        printf '8. Exit\n\n'
+        printf '1. Install skills with the npx skills selector\n'
+        printf '2. Install / update ALL skills automatically\n'
+        printf '3. Select skills from the library\n'
+        printf '4. Update already installed skills\n'
+        printf '5. Show available skills\n'
+        printf '6. Show installed skills\n'
+        printf '7. Show Git repository status\n'
+        printf '8. Add an external skill submodule\n'
+        printf '9. Exit\n\n'
         read -r -p 'Choose an option: ' choice
 
         case "$choice" in
-            1) install_all_skills; read -r -p 'Press Enter to continue' ;;
-            2) install_selected_skills; read -r -p 'Press Enter to continue' ;;
-            3) npx skills update -g -y; read -r -p 'Press Enter to continue' ;;
-            4) show_available_skills; read -r -p 'Press Enter to continue' ;;
-            5) npx skills list -g; read -r -p 'Press Enter to continue' ;;
-            6) git -C "$REPO_ROOT" status; read -r -p 'Press Enter to continue' ;;
-            7) add_external_skill; read -r -p 'Press Enter to continue' ;;
-            8) printf 'Goodbye.\n'; return 0 ;;
+            1) install_with_skills_selector; read -r -p 'Press Enter to continue' ;;
+            2) install_all_skills; read -r -p 'Press Enter to continue' ;;
+            3) install_selected_skills; read -r -p 'Press Enter to continue' ;;
+            4) npx skills update -g -y; read -r -p 'Press Enter to continue' ;;
+            5) show_available_skills; read -r -p 'Press Enter to continue' ;;
+            6) npx skills list -g; read -r -p 'Press Enter to continue' ;;
+            7) git -C "$REPO_ROOT" status; read -r -p 'Press Enter to continue' ;;
+            8) add_external_skill; read -r -p 'Press Enter to continue' ;;
+            9) printf 'Goodbye.\n'; return 0 ;;
             *) printf 'Invalid option.\n'; sleep 1 ;;
         esac
     done

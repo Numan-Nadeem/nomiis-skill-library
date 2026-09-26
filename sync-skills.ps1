@@ -179,6 +179,19 @@ function Install-AllSkills {
     Write-Host "Failed:     $failed" -ForegroundColor Red
 }
 
+function Install-WithSkillsSelector {
+    Write-Host "Launching the npx skills selector..." -ForegroundColor Cyan
+    Write-Host "Select the skills you want to install globally." -ForegroundColor DarkGray
+
+    npx skills add $RepoRoot -g --full-depth
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "The skills selector installation failed." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "Selected skills installed successfully." -ForegroundColor Green
+}
+
 function Install-SelectedSkills {
     $skills = @(Show-AvailableSkills)
     if ($skills.Count -eq 0) {
@@ -274,25 +287,27 @@ while ($true) {
     Show-Header
     Write-Host "Repository: $RepoRoot" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "1. Install / update ALL skills"
-    Write-Host "2. Select skills to install / update"
-    Write-Host "3. Update already installed skills"
-    Write-Host "4. Show available skills"
-    Write-Host "5. Show installed skills"
-    Write-Host "6. Show Git repository status"
-    Write-Host "7. Add an external skill submodule"
-    Write-Host "8. Exit"
+    Write-Host "1. Install skills with the npx skills selector"
+    Write-Host "2. Install / update ALL skills automatically"
+    Write-Host "3. Select skills from the library"
+    Write-Host "4. Update already installed skills"
+    Write-Host "5. Show available skills"
+    Write-Host "6. Show installed skills"
+    Write-Host "7. Show Git repository status"
+    Write-Host "8. Add an external skill submodule"
+    Write-Host "9. Exit"
     Write-Host ""
 
     switch (Read-Host "Choose an option") {
-        "1" { Install-AllSkills; Read-Host "Press Enter to continue" }
-        "2" { Install-SelectedSkills; Read-Host "Press Enter to continue" }
-        "3" { Update-InstalledSkills; Read-Host "Press Enter to continue" }
-        "4" { Show-AvailableSkills; Read-Host "Press Enter to continue" }
-        "5" { Show-InstalledSkills; Read-Host "Press Enter to continue" }
-        "6" { Show-RepositoryStatus; Read-Host "Press Enter to continue" }
-        "7" { Add-ExternalSkill; Read-Host "Press Enter to continue" }
-        "8" { Write-Host "Goodbye." -ForegroundColor Cyan; exit 0 }
+        "1" { Install-WithSkillsSelector; Read-Host "Press Enter to continue" }
+        "2" { Install-AllSkills; Read-Host "Press Enter to continue" }
+        "3" { Install-SelectedSkills; Read-Host "Press Enter to continue" }
+        "4" { Update-InstalledSkills; Read-Host "Press Enter to continue" }
+        "5" { Show-AvailableSkills; Read-Host "Press Enter to continue" }
+        "6" { Show-InstalledSkills; Read-Host "Press Enter to continue" }
+        "7" { Show-RepositoryStatus; Read-Host "Press Enter to continue" }
+        "8" { Add-ExternalSkill; Read-Host "Press Enter to continue" }
+        "9" { Write-Host "Goodbye." -ForegroundColor Cyan; exit 0 }
         default { Write-Host "Invalid option." -ForegroundColor Red; Start-Sleep -Seconds 1 }
     }
 }

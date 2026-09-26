@@ -106,7 +106,17 @@ Because `git pull --rebase` and remote submodule updates change repository state
 
 After synchronization, the script displays these options:
 
-### 1. Install / update all skills
+### 1. Install skills with the `npx skills` selector
+
+Runs the CLI selector across the complete repository:
+
+```text
+npx skills add <repository-root> -g --full-depth
+```
+
+Choose the skills you want in the interactive selector. The `--full-depth` option is important because external skills are nested inside submodule directories. This is the recommended installation path when you want the official `npx skills` selection experience.
+
+### 2. Install / update all skills automatically
 
 Scans the `external` and `personal` directories for skills and runs:
 
@@ -116,7 +126,7 @@ npx skills add <skill-path> -g -y
 
 Each discovered skill is installed independently. The summary reports successful and failed installations.
 
-### 2. Select skills to install / update
+### 3. Select skills from the library
 
 Displays a numbered list of discovered skills. Enter comma-separated numbers, for example:
 
@@ -126,7 +136,7 @@ Displays a numbered list of discovered skills. Enter comma-separated numbers, fo
 
 Invalid values are reported and skipped. Valid selections are installed globally.
 
-### 3. Update already installed skills
+### 4. Update already installed skills
 
 Runs:
 
@@ -136,11 +146,11 @@ npx skills update -g -y
 
 This updates skills managed by the global `skills` installation.
 
-### 4. Show available skills
+### 5. Show available skills
 
 Lists every skill discovered in the repository, including its name, type, and relative source path.
 
-### 5. Show installed skills
+### 6. Show installed skills
 
 Runs:
 
@@ -150,11 +160,11 @@ npx skills list -g
 
 Use this after the first installation to confirm that skills were registered where expected.
 
-### 6. Show Git repository status
+### 7. Show Git repository status
 
 Runs `git status` from the repository root.
 
-### 7. Add an external skill submodule
+### 8. Add an external skill submodule
 
 Prompts for a Git repository URL and a folder name, then runs:
 
@@ -166,7 +176,7 @@ The folder name may contain letters, numbers, dots, underscores, and hyphens. Th
 
 After adding the submodule, choose option 4 to confirm that it contains a discoverable `SKILL.md`, then choose option 1 or 2 to install it.
 
-### 8. Exit
+### 9. Exit
 
 Closes the script.
 
