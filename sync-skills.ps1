@@ -220,6 +220,38 @@ function Show-RepositoryStatus {
     git status
 }
 
+function Add-ExternalSkill {
+    $url = Read-Host "External skill repository URL"
+    $name = Read-Host "External skill folder name"
+
+    if ([string]::IsNullOrWhiteSpace($url) -or [string]::IsNullOrWhiteSpace($name)) {
+        Write-Host "Repository URL and folder name are required." -ForegroundColor Red
+        return
+    }
+
+    if ($name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        Write-Host "Folder name may contain only letters, numbers, dots, underscores, and hyphens." -ForegroundColor Red
+        return
+    }
+
+    $relativePath = Join-Path "external" $name
+    $fullPath = Join-Path $RepoRoot $relativePath
+
+    if (Test-Path $fullPath) {
+        Write-Host "The folder already exists: $relativePath" -ForegroundColor Red
+        return
+    }
+
+    git submodule add $url $relativePath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to add the external skill submodule." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "External skill added: $relativePath" -ForegroundColor Green
+    Write-Host "Review and commit the .gitmodules and submodule changes." -ForegroundColor Yellow
+}
+
 try {
     Show-Header
     Test-Dependencies
@@ -241,7 +273,8 @@ while ($true) {
     Write-Host "4. Show available skills"
     Write-Host "5. Show installed skills"
     Write-Host "6. Show Git repository status"
-    Write-Host "7. Exit"
+    Write-Host "7. Add an external skill submodule"
+    Write-Host "8. Exit"
     Write-Host ""
 
     switch (Read-Host "Choose an option") {
@@ -251,7 +284,8 @@ while ($true) {
         "4" { Show-AvailableSkills; Read-Host "Press Enter to continue" }
         "5" { Show-InstalledSkills; Read-Host "Press Enter to continue" }
         "6" { Show-RepositoryStatus; Read-Host "Press Enter to continue" }
-        "7" { Write-Host "Goodbye." -ForegroundColor Cyan; exit 0 }
+        "7" { Add-ExternalSkill; Read-Host "Press Enter to continue" }
+        "8" { Write-Host "Goodbye." -ForegroundColor Cyan; exit 0 }
         default { Write-Host "Invalid option." -ForegroundColor Red; Start-Sleep -Seconds 1 }
     }
 }

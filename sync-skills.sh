@@ -159,6 +159,39 @@ install_selected_skills() {
     done
 }
 
+add_external_skill() {
+    local url
+    local name
+    local destination
+
+    read -r -p 'External skill repository URL: ' url
+    read -r -p 'External skill folder name: ' name
+
+    if [[ -z "$url" || -z "$name" ]]; then
+        printf 'Repository URL and folder name are required.\n' >&2
+        return 1
+    fi
+
+    if [[ ! "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        printf 'Folder name may contain only letters, numbers, dots, underscores, and hyphens.\n' >&2
+        return 1
+    fi
+
+    destination="external/$name"
+    if [[ -e "$REPO_ROOT/$destination" ]]; then
+        printf 'The folder already exists: %s\n' "$destination" >&2
+        return 1
+    fi
+
+    if ! git -C "$REPO_ROOT" submodule add "$url" "$destination"; then
+        printf 'Failed to add the external skill submodule.\n' >&2
+        return 1
+    fi
+
+    printf 'External skill added: %s\n' "$destination"
+    printf 'Review and commit the .gitmodules and submodule changes.\n'
+}
+
 run_menu() {
     local choice
     while true; do
@@ -170,7 +203,8 @@ run_menu() {
         printf '4. Show available skills\n'
         printf '5. Show installed skills\n'
         printf '6. Show Git repository status\n'
-        printf '7. Exit\n\n'
+        printf '7. Add an external skill submodule\n'
+        printf '8. Exit\n\n'
         read -r -p 'Choose an option: ' choice
 
         case "$choice" in
@@ -180,7 +214,8 @@ run_menu() {
             4) show_available_skills; read -r -p 'Press Enter to continue' ;;
             5) npx skills list -g; read -r -p 'Press Enter to continue' ;;
             6) git -C "$REPO_ROOT" status; read -r -p 'Press Enter to continue' ;;
-            7) printf 'Goodbye.\n'; return 0 ;;
+            7) add_external_skill; read -r -p 'Press Enter to continue' ;;
+            8) printf 'Goodbye.\n'; return 0 ;;
             *) printf 'Invalid option.\n'; sleep 1 ;;
         esac
     done

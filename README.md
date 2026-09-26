@@ -154,7 +154,19 @@ Use this after the first installation to confirm that skills were registered whe
 
 Runs `git status` from the repository root.
 
-### 7. Exit
+### 7. Add an external skill submodule
+
+Prompts for a Git repository URL and a folder name, then runs:
+
+```text
+git submodule add <repository-url> external/<folder-name>
+```
+
+The folder name may contain letters, numbers, dots, underscores, and hyphens. The target folder must not already exist. The command updates `.gitmodules` and creates the submodule checkout. Review the new skill contents before committing the changes.
+
+After adding the submodule, choose option 4 to confirm that it contains a discoverable `SKILL.md`, then choose option 1 or 2 to install it.
+
+### 8. Exit
 
 Closes the script.
 
@@ -206,7 +218,7 @@ nomiis-skill-library/
 +-- README.md
 ```
 
-To add a personal skill, create a directory under `personal`, add a `SKILL.md` file, and run the script again. External skills should normally remain managed by their Git submodule.
+To add a personal skill, create a directory under `personal`, add a `SKILL.md` file, and run the manager again. To add an external skill, use menu option 7 so Git records the repository in `.gitmodules`.
 
 ## External Skill Updates
 
