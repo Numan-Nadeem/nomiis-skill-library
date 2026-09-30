@@ -4,3 +4,9 @@
 [submodule "external/taste-skill"]
 	path = external/taste-skill
 	url = https://github.com/Leonxlnx/taste-skill
+[submodule "external/skills"]
+	path = external/skills
+	url = https://github.com/emilkowalski/skills
+[submodule "external/impeccable"]
+	path = external/impeccable
+	url = https://github.com/pbakaus/impeccable
