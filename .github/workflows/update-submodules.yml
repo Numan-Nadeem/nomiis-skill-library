@@ -1,0 +1,48 @@
+name: Update submodules
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-submodules
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Update submodules
+        run: git submodule update --remote --recursive
+
+      - name: Open pull request when updates are available
+        id: pull-request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/update-submodules
+          delete-branch: true
+          commit-message: "chore: update git submodules"
+          title: "chore: update git submodules"
+          body: |
+            Updates the repository's Git submodules to their latest configured remote commits.
+
+            Please review the submodule changes before merging.
+
+      - name: Merge update pull request automatically
+        if: steps.pull-request.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pull-request.outputs.pull-request-number }}
+        run: gh pr merge "$PR_NUMBER" --squash --delete-branch

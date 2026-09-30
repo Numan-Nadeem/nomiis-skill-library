@@ -1,0 +1,11 @@
+version: 2
+
+# Dependabot does not manage Git submodules. This repository currently has no
+# package manifests, but it can keep GitHub Actions dependencies up to date as
+# workflows are added.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
