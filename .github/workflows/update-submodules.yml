@@ -28,7 +28,7 @@ jobs:
 
       - name: Open pull request when updates are available
         id: pull-request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/update-submodules
