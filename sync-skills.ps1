@@ -75,16 +75,26 @@ function Get-SkillDirectories {
         Get-ChildItem -Path $ExternalDir -Directory | ForEach-Object {
             $repository = $_
 
-            Get-ChildItem -Path $repository.FullName -Filter "SKILL.md" -File -Recurse -ErrorAction SilentlyContinue |
-                ForEach-Object {
-                    $skillDirectory = $_.Directory.FullName
-                    $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
+            # Sort by path depth (shallowest first) then deduplicate by skill name.
+            # This collapses multi-platform repos (e.g. impeccable) that ship the
+            # same SKILL.md for every agent harness into a single entry each.
+            $seen = [System.Collections.Generic.HashSet[string]]::new(
+                [System.StringComparer]::OrdinalIgnoreCase
+            )
 
-                    $skills += [PSCustomObject]@{
-                        Name = $_.Directory.Name
-                        Type = "External"
-                        Source = $relativePath
-                        Path = $skillDirectory
+            Get-ChildItem -Path $repository.FullName -Filter "SKILL.md" -File -Recurse -ErrorAction SilentlyContinue |
+                Sort-Object { ($_.FullName -split [regex]::Escape([System.IO.Path]::DirectorySeparatorChar)).Count } |
+                ForEach-Object {
+                    if ($seen.Add($_.Directory.Name)) {
+                        $skillDirectory = $_.Directory.FullName
+                        $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
+
+                        $skills += [PSCustomObject]@{
+                            Name = $_.Directory.Name
+                            Type = "External"
+                            Source = $relativePath
+                            Path = $skillDirectory
+                        }
                     }
                 }
         }

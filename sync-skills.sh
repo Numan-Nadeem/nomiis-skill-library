@@ -42,7 +42,21 @@ sync_repository() {
 
 get_skill_files() {
     if [[ -d "$EXTERNAL_DIR" ]]; then
-        find "$EXTERNAL_DIR" -type f -name 'SKILL.md' -print
+        # Iterate per external repo so deduplication is scoped to each one.
+        # Sort results by path depth (shallowest first) then deduplicate by
+        # skill directory name. This collapses multi-platform repos (e.g.
+        # impeccable) that ship the same SKILL.md for every agent harness
+        # into a single entry each, while still listing every distinctly
+        # named skill from repos like emilkowalski/skills.
+        local repo_dir
+        for repo_dir in "$EXTERNAL_DIR"/*/; do
+            [[ -d "$repo_dir" ]] || continue
+            find "$repo_dir" -type f -name 'SKILL.md' -print \
+                | awk -F'/' '{print NF"\t"$0}' \
+                | sort -n \
+                | awk -F'\t' '{print $2}' \
+                | awk -F'/' '!seen[$(NF-1)]++'
+        done
     fi
 
     if [[ -d "$PERSONAL_DIR" ]]; then
