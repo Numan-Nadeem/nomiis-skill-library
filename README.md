@@ -190,11 +190,21 @@ External skills are searched recursively below each direct child directory of `e
 external/<repository>/**/SKILL.md
 ```
 
-Personal skills are searched one level below `personal`:
+Personal skills support two layouts:
+
+**Flat** — the skill sits directly inside a named folder:
 
 ```text
 personal/<skill-name>/SKILL.md
 ```
+
+**Categorized** — the skill is grouped under a category folder one level deeper:
+
+```text
+personal/<category>/<skill-name>/SKILL.md
+```
+
+Both layouts are discovered and installed by both managers. Categorized skills display their category in the type column, for example `Personal / image-tools`.
 
 A personal directory is optional. The current repository may contain only external skills.
 
@@ -212,11 +222,15 @@ nomiis-skill-library/
 |               +-- SKILL.md
 |
 +-- personal/
-|   +-- typescript/
-|       +-- SKILL.md
-|   +-- nextjs/
-|       +-- SKILL.md
-|   +-- etsy/
+|   |
+|   +-- image-tools/               <- category folder
+|   |   +-- strip-image-metadata/
+|   |       +-- SKILL.md
+|   |       +-- scripts/
+|   |           +-- strip_png_metadata.js
+|   |           +-- strip_jpeg_metadata.js
+|   |
+|   +-- my-flat-skill/             <- flat (no category)
 |       +-- SKILL.md
 |
 +-- .github/
@@ -228,7 +242,7 @@ nomiis-skill-library/
 +-- README.md
 ```
 
-To add a personal skill, create a directory under `personal`, add a `SKILL.md` file, and run the manager again. To add an external skill, use menu option 7 so Git records the repository in `.gitmodules`.
+To add a personal skill, create a directory under `personal` (optionally inside a category sub-folder), add a `SKILL.md` file, and run the manager again. Skills with bundled assets such as scripts should place them alongside `SKILL.md` in the skill directory. To add an external skill, use menu option 8 so Git records the repository in `.gitmodules`.
 
 ## External Skill Updates
 

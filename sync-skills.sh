@@ -47,7 +47,12 @@ get_skill_files() {
 
     if [[ -d "$PERSONAL_DIR" ]]; then
         local skill_file
+        # Flat layout: personal/<skill-name>/SKILL.md
         for skill_file in "$PERSONAL_DIR"/*/SKILL.md; do
+            [[ -f "$skill_file" ]] && printf '%s\n' "$skill_file"
+        done
+        # Categorized layout: personal/<category>/<skill-name>/SKILL.md
+        for skill_file in "$PERSONAL_DIR"/*/*/SKILL.md; do
             [[ -f "$skill_file" ]] && printf '%s\n' "$skill_file"
         done
     fi
@@ -60,6 +65,11 @@ skill_name() {
 skill_type() {
     if [[ "$1" == "$EXTERNAL_DIR"/* ]]; then
         printf 'External'
+    elif [[ "$1" == "$PERSONAL_DIR"/*/* ]]; then
+        # Categorized personal skill: personal/<category>/<skill-name>
+        local category
+        category="$(basename "$(dirname "$1")")"
+        printf 'Personal / %s' "$category"
     else
         printf 'Personal'
     fi

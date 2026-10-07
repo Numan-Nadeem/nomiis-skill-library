@@ -92,17 +92,35 @@ function Get-SkillDirectories {
 
     if (Test-Path $PersonalDir) {
         Get-ChildItem -Path $PersonalDir -Directory | ForEach-Object {
-            $skillDirectory = $_.FullName
-            $skillFile = Join-Path $skillDirectory "SKILL.md"
+            $topLevel = $_
+            $directSkillFile = Join-Path $topLevel.FullName "SKILL.md"
 
-            if (Test-Path $skillFile) {
-                $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
+            if (Test-Path $directSkillFile) {
+                # Flat layout: personal/<skill-name>/SKILL.md
+                $relativePath = $topLevel.FullName.Substring($RepoRoot.Length).TrimStart('\')
 
                 $skills += [PSCustomObject]@{
-                    Name = $_.Name
-                    Type = "Personal"
+                    Name   = $topLevel.Name
+                    Type   = "Personal"
                     Source = $relativePath
-                    Path = $skillDirectory
+                    Path   = $topLevel.FullName
+                }
+            } else {
+                # Categorized layout: personal/<category>/<skill-name>/SKILL.md
+                Get-ChildItem -Path $topLevel.FullName -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+                    $skillDirectory = $_.FullName
+                    $skillFile = Join-Path $skillDirectory "SKILL.md"
+
+                    if (Test-Path $skillFile) {
+                        $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
+
+                        $skills += [PSCustomObject]@{
+                            Name   = $_.Name
+                            Type   = "Personal / $($topLevel.Name)"
+                            Source = $relativePath
+                            Path   = $skillDirectory
+                        }
+                    }
                 }
             }
         }
