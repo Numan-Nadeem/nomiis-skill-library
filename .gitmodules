@@ -10,3 +10,6 @@
 [submodule "external/impeccable"]
 	path = external/impeccable
 	url = https://github.com/pbakaus/impeccable
+[submodule "external/seo-audit-skill"]
+	path = external/seo-audit-skill
+	url = https://github.com/seo-skills/seo-audit-skill
