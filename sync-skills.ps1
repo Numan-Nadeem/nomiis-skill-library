@@ -3,8 +3,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $RepoRoot
 
-$ExternalDir = Join-Path $RepoRoot "external"
-$PersonalDir = Join-Path $RepoRoot "personal"
+$SkillsDir = Join-Path $RepoRoot "skills"
 
 function Show-Header {
     Clear-Host
@@ -33,90 +32,33 @@ function Test-Dependencies {
 }
 
 function Sync-GitRepository {
-    Write-Host "[1/2] Pulling your skills repository..." -ForegroundColor Yellow
+    Write-Host "[1/1] Pulling your skills repository..." -ForegroundColor Yellow
     git pull --rebase
     if ($LASTEXITCODE -ne 0) {
         throw "Git pull failed."
     }
-
-    Write-Host "[2/2] Initializing/updating submodules..." -ForegroundColor Yellow
-    git submodule sync --recursive
-    if ($LASTEXITCODE -ne 0) {
-        throw "Git submodule sync failed."
-    }
-
-    $submodulePaths = @(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' |
-        ForEach-Object {
-            ($_ -split '\s+', 2)[1]
-        })
-
-    foreach ($submodulePath in $submodulePaths) {
-        $submoduleChanges = @(git -C $submodulePath status --porcelain)
-        if ($submoduleChanges.Count -gt 0) {
-            throw "A submodule has local changes: $submodulePath. Commit or stash them before updating external skills."
-        }
-    }
-
-    git submodule update --init --remote --recursive
-    if ($LASTEXITCODE -ne 0) {
-        throw "Git submodule update failed."
-    }
-
-    Write-Host ""
-    Write-Host "Submodule status:" -ForegroundColor Cyan
-    git submodule status --recursive
-    Write-Host ""
 }
 
 function Get-SkillDirectories {
     $skills = @()
 
-    if (Test-Path $ExternalDir) {
-        Get-ChildItem -Path $ExternalDir -Directory | ForEach-Object {
-            $repository = $_
-
-            # Sort by path depth (shallowest first) then deduplicate by skill name.
-            # This collapses multi-platform repos (e.g. impeccable) that ship the
-            # same SKILL.md for every agent harness into a single entry each.
-            $seen = [System.Collections.Generic.HashSet[string]]::new(
-                [System.StringComparer]::OrdinalIgnoreCase
-            )
-
-            Get-ChildItem -Path $repository.FullName -Filter "SKILL.md" -File -Recurse -ErrorAction SilentlyContinue |
-                Sort-Object { ($_.FullName -split [regex]::Escape([System.IO.Path]::DirectorySeparatorChar)).Count } |
-                ForEach-Object {
-                    if ($seen.Add($_.Directory.Name)) {
-                        $skillDirectory = $_.Directory.FullName
-                        $relativePath = $skillDirectory.Substring($RepoRoot.Length).TrimStart('\')
-
-                        $skills += [PSCustomObject]@{
-                            Name = $_.Directory.Name
-                            Type = "External"
-                            Source = $relativePath
-                            Path = $skillDirectory
-                        }
-                    }
-                }
-        }
-    }
-
-    if (Test-Path $PersonalDir) {
-        Get-ChildItem -Path $PersonalDir -Directory | ForEach-Object {
+    if (Test-Path $SkillsDir) {
+        Get-ChildItem -Path $SkillsDir -Directory | ForEach-Object {
             $topLevel = $_
             $directSkillFile = Join-Path $topLevel.FullName "SKILL.md"
 
             if (Test-Path $directSkillFile) {
-                # Flat layout: personal/<skill-name>/SKILL.md
+                # Flat layout: skills/<skill-name>/SKILL.md
                 $relativePath = $topLevel.FullName.Substring($RepoRoot.Length).TrimStart('\')
 
                 $skills += [PSCustomObject]@{
                     Name   = $topLevel.Name
-                    Type   = "Personal"
+                    Type   = "uncategorized"
                     Source = $relativePath
                     Path   = $topLevel.FullName
                 }
             } else {
-                # Categorized layout: personal/<category>/<skill-name>/SKILL.md
+                # Categorized layout: skills/<category>/<skill-name>/SKILL.md
                 Get-ChildItem -Path $topLevel.FullName -Directory -ErrorAction SilentlyContinue | ForEach-Object {
                     $skillDirectory = $_.FullName
                     $skillFile = Join-Path $skillDirectory "SKILL.md"
@@ -126,7 +68,7 @@ function Get-SkillDirectories {
 
                         $skills += [PSCustomObject]@{
                             Name   = $_.Name
-                            Type   = "Personal / $($topLevel.Name)"
+                            Type   = $topLevel.Name
                             Source = $relativePath
                             Path   = $skillDirectory
                         }
@@ -211,7 +153,7 @@ function Install-WithSkillsSelector {
     Write-Host "Launching the npx skills selector..." -ForegroundColor Cyan
     Write-Host "Select the skills you want to install globally." -ForegroundColor DarkGray
 
-    npx skills add $RepoRoot -g --full-depth
+    npx skills add $RepoRoot -g
     if ($LASTEXITCODE -ne 0) {
         Write-Host "The skills selector installation failed." -ForegroundColor Red
         return
@@ -270,34 +212,68 @@ function Show-RepositoryStatus {
 
 function Add-ExternalSkill {
     $url = Read-Host "External skill repository URL"
-    $name = Read-Host "External skill folder name"
+    $category = Read-Host "Category to place the skill(s) under (e.g. design)"
 
-    if ([string]::IsNullOrWhiteSpace($url) -or [string]::IsNullOrWhiteSpace($name)) {
-        Write-Host "Repository URL and folder name are required." -ForegroundColor Red
+    if ([string]::IsNullOrWhiteSpace($url) -or [string]::IsNullOrWhiteSpace($category)) {
+        Write-Host "Repository URL and category are required." -ForegroundColor Red
         return
     }
 
-    if ($name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
-        Write-Host "Folder name may contain only letters, numbers, dots, underscores, and hyphens." -ForegroundColor Red
+    if ($category -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        Write-Host "Category name may contain only letters, numbers, dots, underscores, and hyphens." -ForegroundColor Red
         return
     }
 
-    $relativePath = Join-Path "external" $name
-    $fullPath = Join-Path $RepoRoot $relativePath
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("skills-vendor-" + [System.IO.Path]::GetRandomFileName())
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    $cloneDir = Join-Path $tempRoot "repo"
 
-    if (Test-Path $fullPath) {
-        Write-Host "The folder already exists: $relativePath" -ForegroundColor Red
-        return
-    }
-
-    git submodule add $url $relativePath
+    git clone --depth 1 $url $cloneDir
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Failed to add the external skill submodule." -ForegroundColor Red
+        Write-Host "Failed to clone the repository." -ForegroundColor Red
+        Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
         return
     }
 
-    Write-Host "External skill added: $relativePath" -ForegroundColor Green
-    Write-Host "Review and commit the .gitmodules and submodule changes." -ForegroundColor Yellow
+    # Carry the upstream license/notice files into every vendored copy.
+    $licenseFiles = @(Get-ChildItem -Path $cloneDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(LICENSE|LICENCE|NOTICE)' })
+
+    # Sort by path depth (shallowest first) then deduplicate by skill name.
+    # This collapses multi-platform repos (e.g. impeccable) that ship the
+    # same SKILL.md for every agent harness into a single entry each.
+    $seen = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+
+    $skillFiles = Get-ChildItem -Path $cloneDir -Filter "SKILL.md" -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/]\.git([\\/]|$)' } |
+        Sort-Object { ($_.FullName -split [regex]::Escape([System.IO.Path]::DirectorySeparatorChar)).Count }
+
+    foreach ($file in $skillFiles) {
+        if (-not $seen.Add($file.Directory.Name)) {
+            continue
+        }
+
+        $skillName = $file.Directory.Name
+        $destination = Join-Path (Join-Path $SkillsDir $category) $skillName
+
+        if (Test-Path $destination) {
+            Write-Host "Skipped (already exists): $category/$skillName" -ForegroundColor Yellow
+            continue
+        }
+
+        Copy-Item -Path $file.Directory.FullName -Destination $destination -Recurse
+        foreach ($licenseFile in $licenseFiles) {
+            Copy-Item -Path $licenseFile.FullName -Destination $destination
+        }
+
+        Write-Host "Vendored: $category/$skillName" -ForegroundColor Green
+    }
+
+    Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+    Write-Host ""
+    Write-Host "Review the vendored skills, then commit the changes." -ForegroundColor Yellow
 }
 
 try {
@@ -322,7 +298,7 @@ while ($true) {
     Write-Host "5. Show available skills"
     Write-Host "6. Show installed skills"
     Write-Host "7. Show Git repository status"
-    Write-Host "8. Add an external skill submodule"
+    Write-Host "8. Vendor an external skill from a Git repository"
     Write-Host "9. Exit"
     Write-Host ""
 

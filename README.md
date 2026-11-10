@@ -1,10 +1,33 @@
 # Nomi's AI Skills Library
 
-A Git-based library and cross-platform manager for reusable AI agent skills. The repository keeps external skills as Git submodules and can install selected skills globally with the `skills` command-line tool.
+A categorized library of AI agent skills, installable with a single command through the [`skills`](https://github.com/vercel-labs/skills) CLI, with optional interactive managers for personal syncing across Windows, macOS, and Linux.
+
+## Installation
+
+Anyone can install skills from this repository without cloning it:
+
+```bash
+npx skills add Numan-Nadeem/nomiis-skill-library
+```
+
+This opens the interactive `skills` CLI selector, which lists every skill grouped by the category folders below `skills/`. Useful variations:
+
+```bash
+# Install everything, no prompts
+npx skills add Numan-Nadeem/nomiis-skill-library --all
+
+# Install one skill globally (available in all projects)
+npx skills add Numan-Nadeem/nomiis-skill-library --skill strip-image-metadata -g
+
+# Pin to a specific revision
+npx skills add Numan-Nadeem/nomiis-skill-library@<tag-or-commit>
+```
+
+The CLI detects installed agents (Claude Code, Codex, ZCode, and others) and installs each selected skill into the agent's skills directory, such as `.agents/skills/<name>` or `~/.zcode/skills/<name>`.
 
 ## What This Repository Does
 
-The repository provides equivalent interactive managers for Windows, macOS, and Linux:
+Besides direct `npx skills add` installation, the repository provides equivalent interactive managers for Windows, macOS, and Linux:
 
 - `sync-skills.ps1` for Windows PowerShell or PowerShell 7.
 - `sync-skills.sh` for macOS, Linux, WSL, and other Bash environments.
@@ -12,10 +35,10 @@ The repository provides equivalent interactive managers for Windows, macOS, and 
 Both managers provide an interactive workflow to:
 
 - Pull the latest changes for this repository.
-- Initialize and update the exact submodule commits recorded here.
 - Discover local `SKILL.md` files.
 - Install all skills or selected skills globally.
 - Update and list globally installed skills.
+- Vendor new external skills from Git repositories.
 - Display the repository status.
 
 Both managers resolve repository paths relative to their own location, so they work after cloning to any directory. The managers do not depend on this repository's name or on a particular user's home directory.
@@ -37,21 +60,15 @@ git --version
 npx --version
 ```
 
-The script uses network access for Git synchronization and for the `npx skills` commands.
+The manager scripts use network access for Git synchronization and for the `npx skills` commands. `update-vendored.sh` additionally clones the upstream repositories listed in `vendored-sources.txt`.
 
 ## Quick Start
 
-Clone the repository with its submodule:
+For personal management of the library, clone and run a manager:
 
 ```bash
-git clone --recurse-submodules <repository-url>
+git clone <repository-url>
 cd nomiis-skill-library
-```
-
-If the repository was cloned without `--recurse-submodules`, the managers initialize it automatically on startup. You can also initialize it manually:
-
-```bash
-git submodule update --init --recursive
 ```
 
 On Windows, run from PowerShell:
@@ -83,24 +100,13 @@ Use the least-permissive policy appropriate for your machine. Do not bypass secu
 
 ## Startup Synchronization
 
-Every time a manager starts, it runs these commands in order:
+Every time a manager starts, it runs:
 
 ```text
 git pull --rebase
-git submodule sync --recursive
-check each submodule with git status --porcelain
-git submodule update --init --remote --recursive
 ```
 
-This means:
-
-1. The main repository is rebased onto the remote branch.
-2. Submodule URLs are synchronized with `.gitmodules`.
-3. Submodules are initialized and updated to the latest commit on each submodule's configured remote branch.
-
-External repositories update automatically on every manager start. The clean-submodule check prevents an update when a submodule contains local changes. The parent repository may then show a modified submodule gitlink; review and commit that gitlink if you want to record the newly selected external revision in your clone.
-
-Because `git pull --rebase` and remote submodule updates change repository state, commit or stash important local changes before running a manager. A pull can also fail when the branch has conflicts, no upstream branch, or no network access.
+The main repository is rebased onto the remote branch. Because this changes repository state, commit or stash important local changes before running a manager. A pull can also fail when the branch has conflicts, no upstream branch, or no network access.
 
 ## Interactive Menu
 
@@ -111,14 +117,14 @@ After synchronization, the script displays these options:
 Runs the CLI selector across the complete repository:
 
 ```text
-npx skills add <repository-root> -g --full-depth
+npx skills add <repository-root> -g
 ```
 
-Choose the skills you want in the interactive selector. The `--full-depth` option is important because external skills are nested inside submodule directories. This is the recommended installation path when you want the official `npx skills` selection experience.
+Choose the skills you want in the interactive selector. Because every skill lives under the standard `skills/` container directory, no extra flags are required. This is the recommended installation path when you want the official `npx skills` selection experience.
 
 ### 2. Install / update all skills automatically
 
-Scans the `external` and `personal` directories for skills and runs:
+Scans the `skills` directory for skills and runs:
 
 ```powershell
 npx skills add <skill-path> -g -y
@@ -148,7 +154,7 @@ This updates skills managed by the global `skills` installation.
 
 ### 5. Show available skills
 
-Lists every skill discovered in the repository, including its name, type, and relative source path.
+Lists every skill discovered in the repository, including its name, category, and relative source path.
 
 ### 6. Show installed skills
 
@@ -164,17 +170,13 @@ Use this after the first installation to confirm that skills were registered whe
 
 Runs `git status` from the repository root.
 
-### 8. Add an external skill submodule
+### 8. Vendor an external skill from a Git repository
 
-Prompts for a Git repository URL and a folder name, then runs:
+Prompts for a Git repository URL and a category, then clones the repository, locates every distinct `SKILL.md`, and copies each skill folder into `skills/<category>/<skill-name>/` together with the upstream `LICENSE`/`NOTICE` files.
 
-```text
-git submodule add <repository-url> external/<folder-name>
-```
+The category name may contain letters, numbers, dots, underscores, and hyphens. Existing destination folders are skipped, so remove a folder first to re-vendor it. Review the new skill contents before committing the changes.
 
-The folder name may contain letters, numbers, dots, underscores, and hyphens. The target folder must not already exist. The command updates `.gitmodules` and creates the submodule checkout. Review the new skill contents before committing the changes.
-
-After adding the submodule, choose option 4 to confirm that it contains a discoverable `SKILL.md`, then choose option 1 or 2 to install it.
+After vendoring, choose option 5 to confirm the skill is discoverable, then choose option 1 or 2 to install it.
 
 ### 9. Exit
 
@@ -182,31 +184,21 @@ Closes the script.
 
 ## Skill Discovery Rules
 
-Both managers recognize a skill when they find a file named exactly `SKILL.md`.
+Both managers recognize a skill when they find a file named exactly `SKILL.md` inside the `skills` directory. Two layouts are supported:
 
-External skills are searched recursively below each direct child directory of `external`:
+**Categorized** — the skill is grouped under a category folder:
 
 ```text
-external/<repository>/**/SKILL.md
+skills/<category>/<skill-name>/SKILL.md
 ```
-
-Personal skills support two layouts:
 
 **Flat** — the skill sits directly inside a named folder:
 
 ```text
-personal/<skill-name>/SKILL.md
+skills/<skill-name>/SKILL.md
 ```
 
-**Categorized** — the skill is grouped under a category folder one level deeper:
-
-```text
-personal/<category>/<skill-name>/SKILL.md
-```
-
-Both layouts are discovered and installed by both managers. Categorized skills display their category in the type column, for example `Personal / image-tools`.
-
-A personal directory is optional. The current repository may contain only external skills.
+Both layouts are discovered and installed by both managers, and both are also visible to `npx skills add Numan-Nadeem/nomiis-skill-library`. Categorized skills display their category in the type column, for example `image-tools`.
 
 The displayed skill name is the name of the directory containing `SKILL.md`. If two discovered directories have the same name, the menu can contain duplicate-looking entries, so use the displayed source path to distinguish them.
 
@@ -215,46 +207,73 @@ The displayed skill name is the name of the directory containing `SKILL.md`. If 
 ```text
 nomiis-skill-library/
 |
-+-- external/
-|   +-- cloudflare-security-audit/
-|       +-- skills/
-|           +-- security-audit/
-|               +-- SKILL.md
-|
-+-- personal/
-|   |
-|   +-- image-tools/               <- category folder
++-- skills/                        <- standard container scanned by npx skills
+|   +-- animation/                 <- category folder
+|   |   +-- animate/
+|   |   |   +-- SKILL.md
+|   |   |   +-- LICENSE
+|   |   +-- ...
+|   +-- design/
+|   |   +-- design-taste-frontend/
+|   |   |   +-- SKILL.md
+|   |   |   +-- assets/
+|   |   |   +-- references/
+|   |   |   +-- LICENSE
+|   |   +-- impeccable/
+|   |   |   +-- SKILL.md
+|   |   |   +-- LICENSE
+|   |   |   +-- NOTICE.md
+|   |   +-- ...
+|   +-- image-tools/
 |   |   +-- strip-image-metadata/
 |   |       +-- SKILL.md
 |   |       +-- scripts/
 |   |           +-- strip_png_metadata.js
 |   |           +-- strip_jpeg_metadata.js
-|   |
-|   +-- my-flat-skill/             <- flat (no category)
-|       +-- SKILL.md
+|   +-- mobile/
+|   +-- security/
+|   +-- seo/
 |
 +-- .github/
 |   +-- dependabot/
-|       +-- dependabot.yml
-+-- .gitmodules
+|   +-- workflows/
+|       +-- update-vendored.yml
 +-- sync-skills.ps1
 +-- sync-skills.sh
++-- update-vendored.sh
++-- vendored-sources.txt
 +-- README.md
 ```
 
-To add a personal skill, create a directory under `personal` (optionally inside a category sub-folder), add a `SKILL.md` file, and run the manager again. Skills with bundled assets such as scripts should place them alongside `SKILL.md` in the skill directory. To add an external skill, use menu option 8 so Git records the repository in `.gitmodules`.
+To add a personal skill, create a directory under `skills` (optionally inside a category sub-folder), add a `SKILL.md` file, and run the manager again. Skills with bundled assets such as scripts should place them alongside `SKILL.md` in the skill directory. To add an external skill, use menu option 8 or edit `vendored-sources.txt` and run `./update-vendored.sh`.
 
-## External Skill Updates
+## Vendored Skills and Updates
 
-The Cloudflare security audit skill is configured as a submodule in `.gitmodules` and is refreshed from its upstream remote automatically:
+Skills from external authors are vendored — committed directly into this repository — so that `npx skills add` can install them. Git submodules would not work here because the `skills` CLI downloads a repository archive, which never includes submodule contents.
 
-```ini
-[submodule "external/cloudflare-security-audit"]
-    path = external/cloudflare-security-audit
-    url = https://github.com/cloudflare/security-audit-skill.git
+Each vendored skill keeps a copy of its upstream `LICENSE` (and `NOTICE` where applicable) inside its folder:
+
+| Skills | Upstream | License |
+| --- | --- | --- |
+| `animation/*`, `mobile/*`, `design/{apple-design, ask-sonner, break-ui, emil-design-eng, pick-ui-library, prototype}` | [emilkowalski/skills](https://github.com/emilkowalski/skills) | MIT |
+| `design/design-taste-frontend` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | MIT |
+| `design/impeccable` | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | Apache-2.0 |
+| `security/security-audit` | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | MIT |
+| `seo/seo-audit` | [seo-skills/seo-audit-skill](https://github.com/seo-skills/seo-audit-skill) | MIT |
+| `image-tools/strip-image-metadata` | personal | — |
+
+Upstream updates are refreshed by `vendored-sources.txt` + `update-vendored.sh`:
+
+```bash
+./update-vendored.sh          # re-vendor every listed skill from its upstream tip
+git diff -- skills            # review the changes
 ```
 
-Dependabot can still propose updates to the submodule pointer in the main repository. The managers also fetch the current upstream submodule revision locally, so users receive external skill updates without waiting for a parent-repository change. Review the changed skill contents and commit the updated gitlink when maintaining a controlled repository state.
+A scheduled GitHub Actions workflow (`.github/workflows/update-vendored.yml`) runs the same script weekly and opens a pull request with any upstream changes. To track a new upstream skill automatically, add a line to `vendored-sources.txt`:
+
+```text
+<category>/<skill-name>|<upstream-repository>|<skill-folder-inside-repo>
+```
 
 ## Troubleshooting
 
@@ -272,22 +291,13 @@ git remote -v
 git branch -vv
 ```
 
-### Submodule content is missing
+### `npx skills add` finds no skills
 
-Run the following from the repository root:
+Confirm that each skill contains a file named exactly `SKILL.md` under `skills/<category>/<skill-name>/`. The file name is case-sensitive in some environments. Skills outside the `skills/` directory are only found with `--full-depth`.
 
-```powershell
-git submodule sync --recursive
-git submodule update --init --remote --recursive
-```
+### A vendored update is skipped
 
-### A submodule update is blocked
-
-The manager stops when an external repository has uncommitted or untracked changes. Enter the submodule directory, commit or stash the changes, and run the manager again. This prevents automatic updates from overwriting local work.
-
-### No skills are listed
-
-Confirm that each skill contains a file named exactly `SKILL.md` in one of the supported locations. The file name is case-sensitive in some environments.
+`update-vendored.sh` reports when a destination folder or an upstream path no longer exists. Upstream repositories occasionally rename or move skill folders; update the affected line in `vendored-sources.txt` to match the new location.
 
 ### Installation fails
 
@@ -303,12 +313,13 @@ Install Bash through your operating system, use WSL on Windows, or use the Power
 
 ## Safety and Maintenance Notes
 
-- Review external skill changes before installing them globally.
-- Keep the main repository and submodule commits under version control.
+- Review vendored skill changes (`git diff -- skills`) before installing them globally.
+- Keep vendored skills in sync with `vendored-sources.txt`; the manifest is the source of truth for automated updates.
+- Respect upstream licenses when vendoring new skills; keep `LICENSE`/`NOTICE` files inside each skill folder.
 - Do not commit credentials, tokens, generated global skill directories, or machine-specific paths.
-- The script uses `-y`, so installation and update commands do not pause for confirmation.
+- The manager scripts use `-y`, so installation and update commands do not pause for confirmation.
 - The exact behavior of `npx skills` can vary by CLI version. Confirm the result with menu option 5 after installation.
-- The script intentionally installs globally with `-g`; remove that flag only if you have verified the desired local installation workflow for your agents.
+- The manager scripts intentionally install globally with `-g`; remove that flag only if you have verified the desired local installation workflow for your agents.
 
 ## Validation
 
@@ -336,4 +347,5 @@ On macOS, Linux, or WSL, check Bash syntax without running synchronization or in
 
 ```bash
 bash -n sync-skills.sh
+bash -n update-vendored.sh
 ```

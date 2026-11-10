@@ -2,8 +2,7 @@
 set -u
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-EXTERNAL_DIR="$REPO_ROOT/external"
-PERSONAL_DIR="$REPO_ROOT/personal"
+SKILLS_DIR="$REPO_ROOT/skills"
 
 show_header() {
     clear 2>/dev/null || true
@@ -20,56 +19,24 @@ require_command() {
 }
 
 sync_repository() {
-    printf '[1/2] Pulling your skills repository...\n'
+    printf '[1/1] Pulling your skills repository...\n'
     git -C "$REPO_ROOT" pull --rebase || {
         printf 'Git pull failed.\n' >&2
         return 1
     }
-
-    printf '[2/2] Initializing/updating submodules...\n'
-    git -C "$REPO_ROOT" submodule sync --recursive || return 1
-    if ! git -C "$REPO_ROOT" submodule foreach --recursive 'test -z "$(git status --porcelain)"'; then
-        printf 'A submodule has local changes. Commit or stash them before updating external skills.\n' >&2
-        return 1
-    fi
-
-    git -C "$REPO_ROOT" submodule update --init --remote --recursive || return 1
-
-    printf '\nSubmodule status:\n'
-    git -C "$REPO_ROOT" submodule status --recursive
-    printf '\n'
 }
 
 get_skill_files() {
-    if [[ -d "$EXTERNAL_DIR" ]]; then
-        # Iterate per external repo so deduplication is scoped to each one.
-        # Sort results by path depth (shallowest first) then deduplicate by
-        # skill directory name. This collapses multi-platform repos (e.g.
-        # impeccable) that ship the same SKILL.md for every agent harness
-        # into a single entry each, while still listing every distinctly
-        # named skill from repos like emilkowalski/skills.
-        local repo_dir
-        for repo_dir in "$EXTERNAL_DIR"/*/; do
-            [[ -d "$repo_dir" ]] || continue
-            find "$repo_dir" -type f -name 'SKILL.md' -print \
-                | awk -F'/' '{print NF"\t"$0}' \
-                | sort -n \
-                | awk -F'\t' '{print $2}' \
-                | awk -F'/' '!seen[$(NF-1)]++'
-        done
-    fi
-
-    if [[ -d "$PERSONAL_DIR" ]]; then
-        local skill_file
-        # Flat layout: personal/<skill-name>/SKILL.md
-        for skill_file in "$PERSONAL_DIR"/*/SKILL.md; do
-            [[ -f "$skill_file" ]] && printf '%s\n' "$skill_file"
-        done
-        # Categorized layout: personal/<category>/<skill-name>/SKILL.md
-        for skill_file in "$PERSONAL_DIR"/*/*/SKILL.md; do
-            [[ -f "$skill_file" ]] && printf '%s\n' "$skill_file"
-        done
-    fi
+    [[ -d "$SKILLS_DIR" ]] || return 0
+    local skill_file
+    # Categorized layout: skills/<category>/<skill-name>/SKILL.md
+    for skill_file in "$SKILLS_DIR"/*/*/SKILL.md; do
+        [[ -f "$skill_file" ]] && printf '%s\n' "$skill_file"
+    done
+    # Flat layout: skills/<skill-name>/SKILL.md
+    for skill_file in "$SKILLS_DIR"/*/SKILL.md; do
+        [[ -f "$skill_file" ]] && printf '%s\n' "$skill_file"
+    done
 }
 
 skill_name() {
@@ -77,15 +44,12 @@ skill_name() {
 }
 
 skill_type() {
-    if [[ "$1" == "$EXTERNAL_DIR"/* ]]; then
-        printf 'External'
-    elif [[ "$1" == "$PERSONAL_DIR"/*/* ]]; then
-        # Categorized personal skill: personal/<category>/<skill-name>
-        local category
-        category="$(basename "$(dirname "$1")")"
-        printf 'Personal / %s' "$category"
+    # skills/<category>/<skill-name> -> category; skills/<skill-name> -> uncategorized
+    local relative="${1#"$SKILLS_DIR"/}"
+    if [[ "$relative" == */* ]]; then
+        printf '%s' "${relative%%/*}"
     else
-        printf 'Personal'
+        printf 'uncategorized'
     fi
 }
 
@@ -157,7 +121,7 @@ install_with_skills_selector() {
     printf 'Launching the npx skills selector...\n'
     printf 'Select the skills you want to install globally.\n'
 
-    if npx skills add "$REPO_ROOT" -g --full-depth; then
+    if npx skills add "$REPO_ROOT" -g; then
         printf 'Selected skills installed successfully.\n'
     else
         printf 'The skills selector installation failed.\n' >&2
@@ -197,35 +161,57 @@ install_selected_skills() {
 
 add_external_skill() {
     local url
-    local name
-    local destination
+    local category
+    local temp_root
+    local skill_file
+    local skill_name
 
     read -r -p 'External skill repository URL: ' url
-    read -r -p 'External skill folder name: ' name
+    read -r -p 'Category to place the skill(s) under (e.g. design): ' category
 
-    if [[ -z "$url" || -z "$name" ]]; then
-        printf 'Repository URL and folder name are required.\n' >&2
+    if [[ -z "$url" || -z "$category" ]]; then
+        printf 'Repository URL and category are required.\n' >&2
         return 1
     fi
 
-    if [[ ! "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-        printf 'Folder name may contain only letters, numbers, dots, underscores, and hyphens.\n' >&2
+    if [[ ! "$category" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        printf 'Category name may contain only letters, numbers, dots, underscores, and hyphens.\n' >&2
         return 1
     fi
 
-    destination="external/$name"
-    if [[ -e "$REPO_ROOT/$destination" ]]; then
-        printf 'The folder already exists: %s\n' "$destination" >&2
+    temp_root="$(mktemp -d)"
+    if ! git clone --depth 1 "$url" "$temp_root/repo"; then
+        printf 'Failed to clone the repository.\n' >&2
+        rm -rf "$temp_root"
         return 1
     fi
 
-    if ! git -C "$REPO_ROOT" submodule add "$url" "$destination"; then
-        printf 'Failed to add the external skill submodule.\n' >&2
-        return 1
-    fi
+    mkdir -p "$SKILLS_DIR/$category"
 
-    printf 'External skill added: %s\n' "$destination"
-    printf 'Review and commit the .gitmodules and submodule changes.\n'
+    # Sort by path depth (shallowest first) then deduplicate by skill
+    # directory name. This collapses multi-platform repos (e.g. impeccable)
+    # that ship the same SKILL.md for every agent harness into a single
+    # entry each.
+    while IFS= read -r skill_file; do
+        [[ -z "$skill_file" ]] && continue
+        skill_name="$(basename "$(dirname "$skill_file")")"
+        if [[ -e "$SKILLS_DIR/$category/$skill_name" ]]; then
+            printf 'Skipped (already exists): %s/%s\n' "$category" "$skill_name"
+            continue
+        fi
+        cp -r "$(dirname "$skill_file")" "$SKILLS_DIR/$category/$skill_name"
+        # Carry the upstream license/notice files into the vendored copy.
+        find "$temp_root/repo" -maxdepth 1 -type f \( -iname 'LICENSE*' -o -iname 'NOTICE*' \) \
+            -exec cp {} "$SKILLS_DIR/$category/$skill_name/" \;
+        printf 'Vendored: %s/%s\n' "$category" "$skill_name"
+    done < <(find "$temp_root/repo" -type f -name 'SKILL.md' -not -path '*/.git/*' -print \
+        | awk -F'/' '{print NF"\t"$0}' \
+        | sort -n \
+        | awk -F'\t' '{print $2}' \
+        | awk -F'/' '!seen[$(NF-1)]++')
+
+    rm -rf "$temp_root"
+    printf '\nReview the vendored skills, then commit the changes.\n'
 }
 
 run_menu() {
@@ -240,7 +226,7 @@ run_menu() {
         printf '5. Show available skills\n'
         printf '6. Show installed skills\n'
         printf '7. Show Git repository status\n'
-        printf '8. Add an external skill submodule\n'
+        printf '8. Vendor an external skill from a Git repository\n'
         printf '9. Exit\n\n'
         read -r -p 'Choose an option: ' choice
 

@@ -1,0 +1,35 @@
+# Vendored skill sources.
+# Format: <destination-in-skills-dir>|<upstream-repository>|<skill-folder-inside-repo>
+# Run ./update-vendored.sh to refresh every listed skill from its upstream tip.
+
+# emilkowalski/skills (MIT)
+animation/animate|https://github.com/emilkowalski/skills|skills/animate
+animation/animate-expo|https://github.com/emilkowalski/skills|skills/animate-expo
+animation/animation-performance|https://github.com/emilkowalski/skills|skills/animation-performance
+animation/animation-vocabulary|https://github.com/emilkowalski/skills|skills/animation-vocabulary
+animation/choreograph|https://github.com/emilkowalski/skills|skills/choreograph
+animation/find-animation-opportunities|https://github.com/emilkowalski/skills|skills/find-animation-opportunities
+animation/gestures|https://github.com/emilkowalski/skills|skills/gestures
+animation/improve-animations|https://github.com/emilkowalski/skills|skills/improve-animations
+animation/remove-animations|https://github.com/emilkowalski/skills|skills/remove-animations
+animation/review-animations|https://github.com/emilkowalski/skills|skills/review-animations
+design/apple-design|https://github.com/emilkowalski/skills|skills/apple-design
+design/ask-sonner|https://github.com/emilkowalski/skills|skills/ask-sonner
+design/break-ui|https://github.com/emilkowalski/skills|skills/break-ui
+design/emil-design-eng|https://github.com/emilkowalski/skills|skills/emil-design-eng
+design/pick-ui-library|https://github.com/emilkowalski/skills|skills/pick-ui-library
+design/prototype|https://github.com/emilkowalski/skills|skills/prototype
+mobile/mobile-native|https://github.com/emilkowalski/skills|skills/mobile-native
+mobile/write-swift|https://github.com/emilkowalski/skills|skills/write-swift
+
+# Leonxlnx/taste-skill (MIT)
+design/design-taste-frontend|https://github.com/Leonxlnx/taste-skill|skills/taste-skill
+
+# pbakaus/impeccable (Apache-2.0) — .agents variant matches where the skills CLI installs
+design/impeccable|https://github.com/pbakaus/impeccable|.agents/skills/impeccable
+
+# cloudflare/security-audit-skill (MIT)
+security/security-audit|https://github.com/cloudflare/security-audit-skill|skills/security-audit
+
+# seo-skills/seo-audit-skill (MIT)
+seo/seo-audit|https://github.com/seo-skills/seo-audit-skill|skill
